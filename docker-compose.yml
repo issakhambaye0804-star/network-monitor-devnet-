@@ -1,0 +1,54 @@
+# Docker Compose pour NetWatch-L3RI
+# Projet d'Examen DEVNET - L3 RI ISI Keur Massar
+# Architecture réseau isolée avec monitoring de conteneurs
+
+version: '3.8'
+
+services:
+  # Service Web Principal - Application Flask
+  web:
+    build: .
+    container_name: netwatch-web
+    ports:
+      - "5000:5000"
+    networks:
+      - netwatch_network
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      - db_serveur
+
+  # Service de Base de Données (voisin réseau)
+  db_serveur:
+    image: nginx:alpine
+    container_name: netwatch-db
+    ports:
+      - "8080:80"
+    networks:
+      - netwatch_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: >
+      sh -c "echo '<h1>NetWatch Database Server</h1><p>Status: Running</p>' > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'"
+
+# Réseau Docker personnalisé isolé
+networks:
+  netwatch_network:
+    driver: bridge
+    name: netwatch_network
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/24
+          gateway: 172.20.0.1

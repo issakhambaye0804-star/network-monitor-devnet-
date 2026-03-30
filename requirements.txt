@@ -1,0 +1,11 @@
+# Dépendances Python pour NetWatch-L3RI
+# Projet d'Examen DEVNET - L3 RI ISI Keur Massar
+
+# Framework web principal
+Flask==2.3.3
+
+# Pour les requêtes HTTP (alternative monitoring)
+requests==2.31.0
+
+# Support pour le développement (optionnel)
+Werkzeug==2.3.7
