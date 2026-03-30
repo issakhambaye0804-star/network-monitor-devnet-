@@ -1,0 +1,86 @@
+# GitHub Actions Workflow pour NetWatch-L3RI
+# Pipeline CI/CD pour construction et déploiement Docker
+# Projet d'Examen DEVNET - L3 RI ISI Keur Massar
+
+name: Build and Deploy
+
+# Déclenchement du workflow
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+# Permissions pour le workflow
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # Job de construction et push de l'image Docker
+  build-and-push:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 1. Récupération du code source
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # 2. Configuration de Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      # 3. Connexion à Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      
+      # 4. Extraction des métadonnées pour les tags
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKER_USERNAME }}/network-monitor-devnet
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            latest
+      
+      # 5. Construction et push de l'image Docker
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+      
+      # 6. Mise à jour de la description sur Docker Hub
+      - name: Update Docker Hub description
+        uses: peter-evans/dockerhub-description@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          repository: ${{ secrets.DOCKER_USERNAME }}/network-monitor-devnet
+          readme-filepath: ./README.md
+
+  # Job de notification de succès
+  notify:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: success()
+    
+    steps:
+      - name: Notification de succès
+        run: |
+          echo "✅ Image Docker construite et poussée avec succès!"
+          echo "🐳 Image disponible sur Docker Hub"
+          echo "🌐 URL: https://hub.docker.com/r/${{ secrets.DOCKER_USERNAME }}/network-monitor-devnet"
